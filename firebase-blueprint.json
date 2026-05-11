@@ -1,0 +1,61 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User specific data including balance and identification.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "phone": { "type": "string" },
+        "balance": { "type": "number" },
+        "identityId": { "type": "string" },
+        "vipLevel": { "type": "number" },
+        "referralCode": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "phone", "balance", "identityId"]
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Financial transactions for a user.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["deposit", "withdraw", "reward", "referral"] },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["success", "pending", "failed", "Completed"] },
+        "date": { "type": "string", "format": "date-time" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "type", "amount", "status", "date", "description"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Recharge or Withdrawal orders.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "amount": { "type": "number" },
+        "type": { "type": "string", "enum": ["deposit", "withdraw"] },
+        "status": { "type": "string", "enum": ["pending", "succeed", "failed"] },
+        "code": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "amount", "type", "status", "code", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Root user profile document."
+    },
+    "/users/{userId}/transactions/{transactionId}": {
+      "schema": "Transaction",
+      "description": "Subcollection of user transactions."
+    },
+    "/users/{userId}/orders/{orderId}": {
+      "schema": "Order",
+      "description": "Subcollection of user orders."
+    }
+  }
+}

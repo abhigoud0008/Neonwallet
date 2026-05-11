@@ -1,0 +1,113 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      // Allow unverified if it's the internal domain we use for phone numbers
+      // or if they are signed in (standard for this specific app's phone login)
+      return isSignedIn() && (
+        request.auth.token.get('email_verified', false) == true || 
+        request.auth.token.email.matches('.*@neonwallet\\.mobile$')
+      );
+    }
+
+    function isOwner(userId) {
+      return isVerified() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) ||
+        request.auth.token.email == "abhigoud9346@gmail.com" ||
+        request.auth.token.email == "9346507994@neonwallet.mobile"
+      );
+    }
+
+    match /settings/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // User Profile Rules
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.get('uid', userId) == userId &&
+               (data.get('phone', '') is string && data.get('phone', '').size() <= 32) &&
+               data.balance is number &&
+               (data.get('identityId', '') is string && data.get('identityId', '').size() <= 64) &&
+               data.vipLevel is number &&
+               (data.get('referralCode', '') is string && data.get('referralCode', '').size() <= 64) &&
+               (data.get('name', '') is string && data.get('name', '').size() <= 128) &&
+               (data.get('email', '') is string && data.get('email', '').size() <= 128);
+      }
+
+      allow list: if isAdmin();
+      allow get: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId) && isValidUser(incoming()) && incoming().createdAt == request.time;
+      allow update: if (isOwner(userId) && isValidUser(incoming()) && (
+        // Users can't change their own balance or identity ID or createdAt
+        incoming().createdAt == existing().createdAt &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['phone', 'vipLevel', 'referralCode', 'name', 'email'])
+      )) || isAdmin();
+    }
+
+    // Transaction Rules
+    match /{path=**}/transactions/{txId} {
+      allow list: if isAdmin();
+    }
+
+    match /users/{userId}/transactions/{txId} {
+      function isValidTransaction(data) {
+        return data.type in ['deposit', 'withdrawal', 'task', 'referral', 'withdraw', 'reward'] &&
+               data.amount is number &&
+               data.status in ['success', 'pending', 'failed', 'completed', 'Completed'] &&
+               (data.get('description', '') is string && data.get('description', '').size() <= 200);
+      }
+
+      allow list: if isOwner(userId) || isAdmin();
+      allow get: if isOwner(userId) || isAdmin();
+      // Only system/admin should write transactions in a real app, 
+      // but for this demo, we allow user creation with validation.
+      allow create: if isOwner(userId) && isValidTransaction(incoming());
+      allow update: if isAdmin();
+    }
+
+    // Order Rules
+    match /users/{userId}/orders/{orderId} {
+      function isValidOrder(data) {
+        return data.amount is number &&
+               data.type in ['deposit', 'withdraw'] &&
+               data.status in ['pending', 'succeed', 'failed'] &&
+               data.code is string && data.code.size() <= 20;
+      }
+
+      allow list: if isOwner(userId);
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidOrder(incoming()) && incoming().createdAt == request.time;
+      allow update: if isOwner(userId) && isValidOrder(incoming()) && (
+        existing().status == 'pending' && incoming().diff(existing()).affectedKeys().hasOnly(['status'])
+      );
+    }
+  }
+}
