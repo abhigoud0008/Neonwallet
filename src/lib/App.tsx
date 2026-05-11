@@ -13,7 +13,7 @@ import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import Deposit from '../pages/Deposit';
 import Withdraw from '../pages/Withdraw';
-import Payment from './pages/Payment';
+import Payment from '../pages/Payment';
 import Team from '../pages/Team';
 import Statistics from '../pages/Statistics';
 import PaymentHistory from '../pages/PaymentHistory';
